@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<script src="../lib/d3.v5.min.js"></script>
+<style>
+
+body {
+  margin-top: 50px;
+}
+svg {
+  display: block;
+  margin: auto;
+  padding: 30px 30px 30px 75px;
+}
+
+h2 {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+rect.bordered {
+        stroke: #E6E6E6;
+        stroke-width:2px;   
+      }
+
+text.mono {
+        font-size: 11pt;
+        fill: #aaa;
+        background-color: blue;
+      }
+
+.year-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.label {
+  font-weight: bold;
+}
+
+</style>
+<body>
+  <div>
+    <h2>Visualizing Crimes in New York City</h2>
+    <div class = "year-button">Year</div>
+  </div>
+  <div class = "chart"></div>
+<script type = "text/javascript">
+
+// Set the SVG sizes
+var margin = {top: 20, right: 0, bottom: 50, left: 100},
+    width = 900 - margin.left - margin.right,
+    height = 750 - margin.top - margin.bottom,
+    buroughs = ["Bronx", "Brooklyn", "Manhattan", "Queens", "Staten Island"],
+    crimes = ["Assault", "Burglary", "Housing", "Murder", "Robbery", "Shooting"],
+    gridSize = Math.floor(height / 6),
+    colors = ["#ffffd9", "#edf8b1", "#c7e9b4", "#7fcdbb", "#41b6c4", "#1d91c0", "#225ea8", "#253494", "#081d58"],
+    buckets = 9,
+    legend_gridItem_width = gridSize * 2,
+    years = [2011, 2012, 2013, 2014, 2015];
+
+// Create SVG element
+var svg = d3.select(".chart").append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+    .append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+// Create Y-Axis Burough Labels
+var buroughLabels = svg.selectAll(".burough-label")
+                    .data(buroughs)
+                    .enter().append("text")
+                    .text(function (d) { 
+                      return d; })
+                    .attr("x", 0)
+                    .attr("y", function (d, i) { 
+                      return i * gridSize; })
+                    .style("text-anchor", "end")
+                    .attr("transform", "translate(-6," + gridSize / 1.5 + ")");
+
+// Create X-Axis Crime Type Labels
+var crimeLabels = svg.selectAll(".crime-label")
+                     .data(crimes)
+                    .enter().append("text")
+                     .text(function(d) { return d; })
+                     .attr("x", function(d, i) { return i * gridSize; })
+                     .attr("y", height - margin.bottom - margin.top*2)
+                     .style("text-anchor", "middle")
+                     .attr("transform", "translate(" + gridSize / 2 + ", -6)")
+
+// Load the data
+var heatMap = function(year) {
+  d3.csv("heatmap.csv").then(function(data) {
+    data.forEach(function(d) {
+      d.Bronx = +d.Bronx;
+      d.Brooklyn = +d.Brooklyn;
+      d.Manhattan = d.Manhattan;
+      d.Queens = +d.Queens;
+      d["Staten Island"] = +d["Staten Island"];
+      d["Crime Type"] = d["Crime Type"];
+      d.Year = +d.Year;
+    });
+
+    // Store the data
+    raw_data = data;
+
+    // Reformat the data
+    buroughs = ["Bronx", "Brooklyn", "Manhattan", "Queens", "Staten Island"];
+    data_formatted = [];
+    for (i in raw_data) {
+      for (j in raw_data[i]) {
+        if (buroughs.includes(j)) {
+          if (raw_data[i]["Year"] == year) { // functionality to filter by year based on button input
+            data_formatted.push({burough: j, crime: raw_data[i]["Crime Type"], year: raw_data[i]["Year"], number: raw_data[i][j]});
+          }
+        }
+      }
+    }
+
+    // Create color scale
+    var colorScale = d3.scaleQuantile()
+                             .domain([0, buckets - 1, d3.max(data_formatted, function (d) { return d.number; })])
+                             .range(colors);
+
+    var map_item = svg.selectAll(".crime-counts")
+                   .data(data_formatted, function(d) {
+                      return buroughs.indexOf(d.burough)+':'+crimes.indexOf(d.crime); });
+
+    map_item.append("title");
+
+    map_item.enter().append("rect")
+          .attr("x", function(d) { 
+            return (crimes.indexOf(d.crime) * gridSize); })
+          .attr("y", function(d) { return (buroughs.indexOf(d.burough) * gridSize); })
+          .attr("rx", 4)
+          .attr("ry", 4)
+          .attr("class", "bordered")
+          .attr("width", gridSize)
+          .attr("height", gridSize)
+          .style("fill", function(d) {
+            return(colorScale(d.number));
+          });
+
+    map_item.select("title").text(function(d) { return d.number; });
+
+    // Remove old heat map squares
+    map_item.exit().remove();
+
+    // Add legend
+    var legend = svg.selectAll(".legend")
+                    .data([0].concat(colorScale.quantiles()), function(d) { 
+                      return d; });
+    
+    var legendEnter = legend.enter().append("g")
+          .attr("class", "legend");
+
+    legendEnter.append("rect")
+          .attr("x", function(d, i) {
+            return legend_gridItem_width/3 * i; })
+          .attr("y", height - gridSize/3)
+          .attr("width", legend_gridItem_width/3)
+          .attr("height", gridSize / 3)
+          .style("fill", function(d, i) {
+            return colors[i];
+          });
+
+    legendEnter.append("text")
+          .attr("class", "mono")
+          .text(function(d) {
+            return "≥ " + Math.round(d);
+          })
+          .attr("x", function(d, i) {
+            return (legend_gridItem_width/3 *i) + legend_gridItem_width/10; })
+          .attr("y", height + (gridSize / 4));
+
+    // Add legend title
+    legendEnter.append("text")
+          .attr("class", "mono")
+          .attr("x", 0)
+          .attr("y", height - 45)
+          .attr("fill", "#000")
+          .attr("text-anchor", "middle")
+          .attr("font-weight", "bold")
+          .text("No. of Crimes");
+
+    // Remove old legend when filtering
+    legend.exit().remove();
+
+    // Create X-Axis label
+    svg.append('text')
+        .attr('x', width)
+        .attr('y', height - margin.bottom - margin.top*2)
+        .attr('text-anchor', 'end')
+        .attr('class', 'label')
+        .text('Crime Type');
+
+    // Create Y-Axis label
+    svg.append('text')
+        .attr('x', -60)
+        .attr('y', 0)
+        .attr('class', 'label')
+        .text('Borough');
+
+  });
+};
+// Select initial data set
+heatMap(2011);
+
+// Create Year filter drop down
+var year_filter = d3.select(".year-button")
+                    .append("select")
+                    .selectAll("option")
+                    .data(years)
+
+year_filter.enter()
+          .append("option")
+          .attr("value", function(d) {
+            return d; })
+          .text(function(d) {
+            return d; })
+          .attr("type", "button")
+          .attr("class", "button")
+          .on("click", function(d) {
+            heatMap(d);
+          });
+
+</script>
+</body>
+</html>
+
+
