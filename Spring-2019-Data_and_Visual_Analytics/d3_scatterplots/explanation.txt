@@ -1,0 +1,3 @@
+Q3.a.2 - The feature combination that is better at separating the classes is Wins + Nominations vs. Rating. While the points are closer together than the budget vs. rating plot, there is a more distinct separation of the two clusters with clear red vs. blue groups.
+
+Q3.c - Log scale is used to stretch the range of smaller values to enlarge variability and to shrink the range for larger values to reduce variability creating a more normal dataset. A square root scale is used to weight smaller values to spread those more than the larger values.
