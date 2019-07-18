@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<script src="../lib/d3.v5.min.js"></script>
+<script src="../lib/topojson.v2.min.js"></script>
+<script src="../lib/d3-scale-chromatic.v1.min.js"></script>
+<script src="../lib/d3-tip.min.js"></script>
+<style>
+
+body {
+  margin-top: 75px;
+}
+
+svg {
+  display: block;
+  margin: auto;
+}
+
+h1 {
+  justify-content: center;
+  text-align: center;
+}
+.counties path:hover{
+  opacity: .6;
+}
+
+.states {
+  fill: none;
+  stroke: #fff;
+  stroke-linejoin: round;
+}
+
+.d3-tip {
+  line-height: 1;
+  padding: 12px;
+  background: rgba(43,43,43, 0.8);
+  color: #fff;
+  border-radius: 2px;
+}
+
+</style>
+<body>
+  <h1>Choropleth Map of County Data</h1>
+  <div class = "chart"></div>
+<script type = "text/javascript">
+
+// set the dimensions and margins of the graph
+var margin = {top: 20, right: 0, bottom: 30, left: 75},
+    width = 1050 - margin.left - margin.right,
+    height = 600 - margin.top - margin.bottom;
+
+// Create tool tip
+var tip = d3.tip()
+  .attr('class', 'd3-tip')
+  .offset([-5, 0])
+  .html(function(d) {
+    return 'State: ' + d.state + '<br/>' + 
+           'County: ' + d.county + '<br/>' +
+           'Poverty Rate: ' + d.poverty + '%' + '<br/>' +
+           'Total Population: ' + d.totalpop + '<br/>' +
+           'Income Per Capita: ' +  d.income;
+  })
+
+// append the svg object to the body of the page and append a 'group' element inside the svg
+var svg = d3.select(".chart").append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+
+// Declare map and path
+var path = d3.geoPath();
+
+// Setting color domains(intervals of values) for the map
+var color_domain = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+var legend_labels = ["≤ 1%", "2%", "3%", "4%", "5%", "6%", "7%", "8%", "≥ 9%"]              
+
+// Create color scale
+var color = d3.scaleThreshold()
+    .domain(d3.range(2, 10))
+    .range(d3.schemeBlues[9]);
+
+// Create legend
+var legend = svg.selectAll("legend")
+      .data(color_domain)
+      .enter().append("g")
+      .attr("class", "legend");
+
+var l_spacer = 20;
+
+// Add legend rects
+legend.append("rect")
+  .attr("x", width)
+  .attr("y", function(d, i){ return height - (i*l_spacer) - 2*l_spacer;})
+  .attr("width", l_spacer)
+  .attr("height", l_spacer)
+  .style("fill", function(d, i) { return color(d); })
+  .style("opacity", 0.8);
+
+// Add legend labels
+legend.append("text")
+.attr("x", width + 30)
+.attr("y", function(d, i){ return height - (i*l_spacer) - 2*l_spacer + 12;})
+.text(function(d, i){ return legend_labels[i]; });
+
+// Add legend title
+legend.append("text")
+      .attr("class", "caption")
+      .attr("x", width)
+      .attr("y", height/2 + 45)
+      .attr("fill", "#000")
+      .attr("text-anchor", "middle")
+      .attr("font-weight", "bold")
+      .text("Poverty Rate");
+
+// Read all data files
+var promises = [
+  d3.json("us.json"),
+  d3.csv("county_poverty.csv"),
+  d3.csv("county_detail.csv")
+]
+
+// Call Ready function with promises data
+Promise.all(promises).then(ready)
+
+// Function to parse and join all data
+function ready([us, county_poverty, county_detail]) {
+
+  // Read topoJSON counties data into geographic object
+  usGeo = topojson.feature(us, us.objects.counties);
+
+  // Add poverty data into the usGeo object
+  for (var i = 0; i < county_poverty.length; i++) {
+    // Store county id and poverty rate
+    var Id = county_poverty[i].CensusId;
+
+    // Join poverty value into Geo object on Census Id
+    for (var j = 0; j < usGeo.features.length; j++) {
+      // Store usGeo Id
+      var geoId = usGeo.features[j].id;
+
+      if (Id == geoId) {
+        // Create and populate poverty value in Geo object
+        usGeo.features[j].poverty = parseFloat(county_poverty[i].Poverty);
+        usGeo.features[j].state = county_poverty[i].State;
+        usGeo.features[j].county = county_poverty[i].County;
+        break;
+      }
+    }
+  }
+
+  // Add county details into usGeo object
+  for (var i = 0; i < county_detail.length; i++) {
+    // Store county id
+    var id = county_detail[i].CensusId;
+
+    // Join county details into Geo object on Census id
+    for (var j = 0; j < usGeo.features.length; j++) {
+      // Store usGeo Id
+      var geoId = usGeo.features[j].id;
+
+      if (id == geoId) {
+        usGeo.features[j].totalpop = county_detail[i].TotalPop;
+        usGeo.features[j].income = county_detail[i].IncomePerCap;
+      }
+    }
+  }
+
+  // Append g element inside SVG
+  svg.append("g")
+      .attr("class", "counties")
+    .selectAll("path")
+    .data(usGeo.features)
+    .enter().append("path")
+      .attr("fill", function(d) { return color(d.poverty); })
+      .attr("d", path)
+      .on('mouseover', tip.show) // show and hide tool tip on hover
+      .on('mouseout', tip.hide); 
+
+  svg.append("path")
+      .datum(topojson.mesh(us, us.objects.states, function(a, b) { return a !== b; }))
+      .attr("class", "states")
+      .attr("d", path);
+
+  // Call tooltip
+  svg.call(tip);
+
+}
+
+</script>
+</body>
+</html>
+
+
