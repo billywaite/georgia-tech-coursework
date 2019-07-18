@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<script src="../lib/d3.v5.min.js"></script>
+<style>
+
+body {
+  margin-top: 50px;
+}
+
+.container {
+  text-align: center;
+}
+.barChart {
+  display: inline;
+}
+
+.lineChart {
+  display: inline;
+  position:absolute;
+  margin-top: 30px;
+  margin-left: 10px;
+}
+
+svg text.label {
+  fill:white;
+  font: 15px;  
+  font-weight: 400;
+  text-anchor: middle;
+}
+
+.bar {
+  fill: grey;
+}
+
+.bar:hover {
+  fill: #3182bd;
+  transition: 0.3s;
+}
+
+.tick text {
+  fill: grey;
+}
+
+.line {
+    fill: none;
+    stroke: #ffab00;
+    stroke-width: 3;
+}
+
+</style>
+<body>
+  <div id = "container">
+    <div class = "barChart"></div>
+    <div class = "lineChart"></div>
+  </div>
+<script type = "text/javascript">
+
+// Store the data
+var data = [{country: 'Bangladesh', population_2012: 105905297, growth: {year_2013:42488 , year_2014:934 , year_2015:52633 , year_2016:112822 , year_2017:160792}},
+        {country: 'Ethiopia', population_2012: 75656319, growth: {year_2013:1606010 , year_2014:1606705 , year_2015:1600666 , year_2016:1590077 , year_2017:1580805}},
+        {country: 'Kenya', population_2012: 33007327, growth: {year_2013:705153 , year_2014:703994 , year_2015:699906 , year_2016:694295 , year_2017:687910}},
+        {country: 'Afghanistan', population_2012: 23280573, growth: {year_2013:717151 , year_2014:706082 , year_2015:665025 , year_2016:616262 , year_2017:573643}},
+        {country: 'Morocco', population_2012: 13619520, growth: {year_2013:11862 , year_2014:7997 , year_2015:391 , year_2016:-8820 , year_2017:-17029}}];
+
+// Store data format for bar labels
+var format = d3.format(",");
+
+// set the dimensions and margins of the graph
+var margin = {top: 20, right: 0, bottom: 30, left: 75},
+    width = 960 - margin.left - margin.right,
+    height = 500 - margin.top - margin.bottom;
+
+// set the ranges
+var x = d3.scaleLinear()
+          .range([0, width]);
+
+var y = d3.scaleBand()
+          .range([0, height])
+          .padding(0.1);
+          
+// append the svg object to the body of the page and append a 'group' element inside the svg in the top left
+var svg = d3.select(".barChart").append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+  .append("g")
+    .attr("transform", 
+          "translate(" + margin.left + "," + margin.top + ")");
+
+// Set X and Y domains
+x.domain([0, d3.max(data, function(d) {
+  var country_pop = d.population_2012 + d.growth.year_2013 + d.growth.year_2014 + d.growth.year_2015 + d.growth.year_2016 + d.growth.year_2017
+  return country_pop; })]);
+
+y.domain(data.map(function(d) { return d.country; })).padding(0.1);
+
+// Append Y Axis
+svg.append("g")
+    .attr("class", "yaxis")
+    .call(d3.axisLeft(y));
+
+// Add Bars to g element inside svg
+svg.selectAll(".bar")
+    .data(data)
+  .enter().append("rect")
+    .attr("class", "bar")
+    .attr("x", 0)
+    .attr("height", y.bandwidth())
+    .attr("y", function(d) { return y(d.country); })
+    .attr("width", function(d) {
+      var country_pop = d.population_2012 + d.growth.year_2013 + d.growth.year_2014 + d.growth.year_2015 + d.growth.year_2016 + d.growth.year_2017
+      return x(country_pop); })
+    .on("mouseover", function(d) { lineChart(d.country); }) // Show line chart on mouseover
+    .on("mouseout",  function(d) { d3.selectAll(".lineSVG").remove(); } ); // Eliminate line chart on mouseout
+
+// Add data labels to bar
+svg.selectAll(".text")     
+    .data(data)
+  .enter().append("text")
+    .attr("class","label")
+    .attr("x", 50)
+    .attr("y", function(d) { return y(d.country); })
+    .attr("dy", "2.75em")
+    .text(function(d) {
+      var country_pop = d.population_2012 + d.growth.year_2013 + d.growth.year_2014 + d.growth.year_2015 + d.growth.year_2016 + d.growth.year_2017
+      return format(country_pop); });
+
+// Line chart function called on hovering over a bar
+var lineChart = function(d) {
+
+  // Store countries to create index for accessing country specific data
+  var countries = ["Bangladesh", "Ethiopia", "Kenya", "Afghanistan", "Morocco"];
+  i = countries.indexOf(d);
+
+  // Reformat the data to show growth rates by year
+  var years = [2013, 2014, 2015, 2016, 2017];
+
+  growth_rates = []; // store growth rates
+  running_sum = data[i].population_2012; // store initial population
+  for (j in data[i].growth) {
+    growth_rates.push((data[i].growth[j] / running_sum) * 100); // Calculate and store growth rate
+    running_sum = running_sum + data[i].growth[j]; // update running sum
+  }
+
+  // Create growth array
+  yearly_growth = [];
+  for (index in years) {
+    yearly_growth.push({year: years[index], growth: growth_rates[index]});
+  }
+
+  // Create Line Chart specific sizing
+  var line_margin = {top: 20, right: 20, bottom: 75, left: 35},
+    line_width = 400 - line_margin.left - line_margin.right,
+    line_height = 400 - line_margin.top - line_margin.bottom;
+
+  // Create line chart svg element
+  var line_svg = d3.select(".lineChart").append("svg")
+    .attr("class", "lineSVG")
+    .attr("width", line_width + line_margin.left + line_margin.right)
+    .attr("height", line_height + line_margin.top + line_margin.bottom)
+  .append("g")
+    .attr("transform", 
+          "translate(" + line_margin.left + "," + line_margin.top + ")");
+
+  // Create X Scale
+  var xScale = d3.scaleLinear()
+    .domain([d3.min(yearly_growth, function(d) { return d.year;}),
+             d3.max(yearly_growth, function(d) { return d.year;})])
+    .range([0, line_width]);
+
+  // Create Y Scale
+  var yScale = d3.scaleLinear()
+    .domain([d3.min(yearly_growth, function(d) { return d.growth}), 
+             d3.max(yearly_growth, function(d) { return d.growth})])
+    .range([line_height, 0]);
+
+  // Generate line
+  var line = d3.line()
+    .x(function(d) { return xScale(d.year); }) // set the x values for the line generator
+    .y(function(d) { return yScale(d.growth); }) // set the y values for the line generator 
+    .curve(d3.curveMonotoneX) // apply smoothing to the line
+
+  // Call the x axis in a group tag
+  line_svg.append("g")
+      .attr("class", "x axis")
+      .attr("transform", "translate(0," + line_height + ")")
+      .call(d3.axisBottom(xScale).ticks(5)); // Create an axis component with d3.axisBottom
+
+  // Call the y axis in a group tag
+  line_svg.append("g")
+      .attr("class", "y axis")
+      .call(d3.axisLeft(yScale)); // Create an axis component with d3.axisLeft
+
+  // Append the path, bind the data, and call the line generator 
+  line_svg.append("path")
+      .data([yearly_growth]) // Binds data to the line 
+      .attr("class", "line") // Assign a class for styling 
+      .attr("d", line); // Calls the line generator
+
+  // Add X Axis label
+  line_svg.append("text")
+      .attr("text-anchor", "end")
+      .attr("x", line_width + 15)
+      .attr("y", line_height + 35)
+      .text("Year")
+      .style("font-size", "14px");
+
+  // Add Y Axis label
+  line_svg.append("text")
+      .attr("text-anchor", "end")
+      .attr("x", 0)
+      .attr("y", -10)
+      .text("Pct %")
+      .style("font-size", "14px");
+
+};
+
+
+</script>
+</body>
+</html>
+
+
