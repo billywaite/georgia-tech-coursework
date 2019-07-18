@@ -1,0 +1,19 @@
+trigrams = LOAD 's3://cse6242-2019spring-trigrams-big/*' AS (trigram:chararray, year:float, occurrences:float, books:float);
+
+trigrams_filtered = FILTER trigrams BY (occurrences >= 400) AND (books >= 15);
+grouped_trigram = GROUP trigrams_filtered BY trigram;
+
+sum_by_trigram = FOREACH grouped_trigram
+GENERATE group, SUM(trigrams_filtered.occurrences) AS occurrence_sum, SUM(trigrams_filtered.books) AS book_sum;
+
+avg_trigrams = FOREACH sum_by_trigram
+GENERATE *, occurrence_sum / book_sum AS avg:float;
+
+avg_reduced = FOREACH avg_trigrams GENERATE group, avg;
+
+sorted = ORDER avg_reduced BY avg DESC, group ASC;
+
+final_trigrams = LIMIT sorted 20;
+
+STORE final_trigrams INTO 's3://cse6242oan-2019spring-wwaite6/output-small/' USING PigStorage('\t');
+
